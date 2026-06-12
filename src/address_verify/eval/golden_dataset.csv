@@ -1,0 +1,26 @@
+id,raw_input,expected_primary_number,expected_street_name,expected_street_suffix,expected_city,expected_state,expected_zipcode,expected_av_status,case
+1,"1600 Pennsylvania Ave NW, Washington, DC 20500",1600,PENNSYLVANIA,AVE,WASHINGTON,DC,20500,V4,clean_canonical
+2,"1 Apple Park Way, Cupertino, CA 95014",1,APPLE PARK,WAY,CUPERTINO,CA,95014,V4,clean_canonical
+3,"350 Fifth Avenue, New York NY 10118",350,FIFTH,AVE,NEW YORK,NY,10118,V4,clean_canonical
+4,"410 Terry Ave N, Seattle, WA 98109",410,TERRY,AVE,SEATTLE,WA,98109,V4,clean_canonical
+5,"1 Infinite Loop, Cupertino, CA 95014",1,INFINITE,LOOP,CUPERTINO,CA,95014,V4,clean_canonical
+6,"500 Oracle Parkway, Redwood City, CA 94065",500,ORACLE,PKWY,REDWOOD CITY,CA,94065,V4,clean_canonical
+7,"1 Hacker Way, Menlo Park, CA 94025",1,HACKER,WAY,MENLO PARK,CA,94025,V4,clean_canonical
+8,"160 Spear St, San Francisco CA 94105",160,SPEAR,ST,SAN FRANCISCO,CA,94105,V4,clean_canonical
+9,"1600 pensilvania ave nw washington dc 20500",1600,PENNSYLVANIA,AVE,WASHINGTON,DC,20500,C4,typo_street
+10,"1600 Penn. Ave NW, Washington, DC 20500",1600,PENNSYLVANIA,AVE,WASHINGTON,DC,20500,C4,abbreviated_street
+11,"160 spear street san francisco ca 94105",160,SPEAR,ST,SAN FRANCISCO,CA,94105,V3,lowercase_full_suffix
+12,"350 5th Avenue New York NY 10118",350,FIFTH,AVE,NEW YORK,NY,10118,C4,numeric_vs_word_street
+13,"410 Terry Avenue North, Seattle, WA 98109",410,TERRY,AVE,SEATTLE,WA,98109,V3,full_directional
+14,"1 apple park way cupertino ca",1,APPLE PARK,WAY,CUPERTINO,CA,,V2,missing_zip
+15,"500 Oracle Pkwy, Redwood City, CA 99999",500,ORACLE,PKWY,REDWOOD CITY,CA,94065,C4,wrong_zip
+16,"1 Hacker Way Menlo Park CA 94205",1,HACKER,WAY,MENLO PARK,CA,94025,C4,swapped_digits_zip
+17,"Pennsylvania Ave, Washington DC 20500",,PENNSYLVANIA,AVE,WASHINGTON,DC,20500,V2,missing_primary_number
+18,"1600 Pennsylvania Ave NW DC 20500",1600,PENNSYLVANIA,AVE,WASHINGTON,DC,20500,C3,missing_city
+19,"asdf qwerty nowhere xx 00000",,,,,,,I4,garbage
+20,"Main Street, Springfield",,,,SPRINGFIELD,,,I4,ambiguous_city
+21,"100 Main St, Springfield, MA 01103",100,MAIN,ST,SPRINGFIELD,MA,01103,V4,common_city_name_disambiguated
+22,"1 World Trade Center, New York, NY 10007",1,WORLD TRADE,CTR,NEW YORK,NY,10007,V4,multi_word_street
+23,"221B Baker St, New York, NY 10001",221B,BAKER,ST,NEW YORK,NY,10001,V4,alphanumeric_primary
+24,"1600 Pennsylvania Avenue Northwest, Washington, District of Columbia 20500",1600,PENNSYLVANIA,AVE,WASHINGTON,DC,20500,C4,spelled_out_state_and_direction
+25,"One Microsoft Way, Redmond, WA 98052",1,MICROSOFT,WAY,REDMOND,WA,98052,C4,spelled_out_number
