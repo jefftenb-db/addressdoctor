@@ -99,6 +99,14 @@ spark.sql(f"USE SCHEMA {SCHEMA}")
 
 from pyspark.sql import functions as F
 
+# State is taken from the <state> directory in the file path, which is authoritative.
+# OpenAddresses' properties.region is populated inconsistently across source files
+# (frequently ""), which previously left ~1/3 of rows with a blank state. Files land
+# under {OA_VOL}/<state>/..., so the parent directory of each file is its state.
+_state_from_path = F.upper(
+    F.regexp_extract(F.col("_metadata.file_path"), r"/([^/]+)/[^/]+\.geojson$", 1)
+)
+
 oa_raw = (
     spark.read.json(f"{OA_VOL}/*/*-addresses-*.geojson")
     .select(
@@ -108,11 +116,20 @@ oa_raw = (
         F.col("properties.street").alias("street_raw"),
         F.col("properties.unit").alias("secondary_raw"),
         F.col("properties.city").alias("city"),
-        F.col("properties.region").alias("state"),
+        F.coalesce(
+            F.when(F.trim(_state_from_path) != "", _state_from_path),
+            F.when(F.trim(F.upper(F.col("properties.region"))) != "",
+                   F.upper(F.col("properties.region"))),
+        ).alias("state"),
         F.col("properties.postcode").alias("zipcode"),
         F.col("properties.hash").alias("oa_hash"),
     )
-    .filter(F.col("state").isNotNull() & F.col("zipcode").isNotNull())
+    # Require a non-empty state and zipcode. isNotNull alone leaked empty strings ("")
+    # through, so trim(...) != "" is needed to drop rows missing these fields.
+    .filter(
+        (F.col("state").isNotNull() & (F.trim("state") != ""))
+        & (F.col("zipcode").isNotNull() & (F.trim("zipcode") != ""))
+    )
     .dropDuplicates(["oa_hash"])  # dedup statewide vs county/city overlap
 )
 
