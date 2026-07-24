@@ -19,12 +19,16 @@
 # MAGIC
 # MAGIC Self-locating: we derive the repo root from this notebook's own path, so it works
 # MAGIC regardless of which user or Workspace folder the repo lives in — no hardcoded name.
-# MAGIC We use `%pip install -e` (not a `sys.path` append) because the standardizer runs
-# MAGIC inside a Spark UDF on the executors, and notebook-scoped `%pip` distributes the
-# MAGIC package to them. This cell triggers a Python restart, so it must run first.
+# MAGIC We use a notebook-scoped `%pip install` (not a `sys.path` append) because the
+# MAGIC standardizer runs inside a Spark UDF on the executors, and `%pip` distributes the
+# MAGIC package to them; a driver-only path change would leave the UDF failing.
 # MAGIC
-# MAGIC The `%pip` magic can't read a Python variable, so we invoke it via
-# MAGIC `run_line_magic` with the computed path — this keeps the install notebook-scoped.
+# MAGIC Note: we install **non-editable** (no `-e`). This project uses a `src/` layout, and
+# MAGIC an editable install's finder does not reliably resolve `address_verify` in the
+# MAGIC Databricks kernel (`find_spec` returns `None` even though `pip show` succeeds). A
+# MAGIC plain install builds the package and copies it into site-packages, so it imports
+# MAGIC normally. The `%pip` magic can't read a Python variable, so we invoke it via
+# MAGIC `run_line_magic` with the computed path. This cell triggers a Python restart.
 
 # COMMAND ----------
 
@@ -34,9 +38,9 @@ _nb_path = (
     dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
 )
 repo_root = "/Workspace" + "/".join(_nb_path.split("/")[:-2])
-print(f"Installing address_verify (editable) from: {repo_root}")
+print(f"Installing address_verify from: {repo_root}")
 
-get_ipython().run_line_magic("pip", f"install -q -e {repo_root}")
+get_ipython().run_line_magic("pip", f"install -q {repo_root}")
 
 # COMMAND ----------
 
