@@ -23,6 +23,13 @@ CATALOG = dbutils.widgets.get("catalog")
 SCHEMA = dbutils.widgets.get("schema")
 OA_VOL = dbutils.widgets.get("openaddresses_volume")
 
+# COMMAND ----------
+
+# MAGIC %md Set the session context. The catalog and schema are expected to already
+# MAGIC exist — adjust the widgets above if yours differ from the defaults, then run this.
+
+# COMMAND ----------
+
 spark.sql(f"USE CATALOG {CATALOG}")
 spark.sql(f"USE SCHEMA {SCHEMA}")
 
