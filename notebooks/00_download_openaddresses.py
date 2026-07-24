@@ -38,6 +38,13 @@ dbutils.widgets.text("secret_key", "api_token")
 dbutils.widgets.text("staging_dir", "/tmp/oa_zips")
 dbutils.widgets.dropdown("keep_zip", "false", ["true", "false"])
 
+# COMMAND ----------
+
+# MAGIC %md Read the widget values. Adjust the widgets above if yours differ from the
+# MAGIC defaults, then re-run this cell to pick up the new values.
+
+# COMMAND ----------
+
 OA_VOL = dbutils.widgets.get("openaddresses_volume")
 COLLECTIONS = [c.strip() for c in dbutils.widgets.get("collections").split(",") if c.strip()]
 SECRET_SCOPE = dbutils.widgets.get("secret_scope")

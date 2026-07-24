@@ -46,6 +46,8 @@ def bronze_addresses_raw():
 
 # MAGIC %md ## Parse with ai_query (structured JSON output)
 
+# COMMAND ----------
+
 SCHEMA_JSON = json.dumps(ADDRESS_JSON_SCHEMA)
 
 @dlt.table(name="silver_addresses_parsed")
@@ -89,6 +91,8 @@ def _parsed_spark_schema() -> StructType:
 
 # MAGIC %md ## Standardize using the USPS Pub 28 tables from the shared package
 
+# COMMAND ----------
+
 _suffix_map_bc = spark.sparkContext.broadcast(STREET_SUFFIX)
 _unit_map_bc = spark.sparkContext.broadcast(SECONDARY_DESIGNATOR)
 _dir_map_bc = spark.sparkContext.broadcast(DIRECTIONAL)
@@ -114,6 +118,8 @@ def silver_addresses_standardized():
 
 # MAGIC %md ## Exact hash-match against reference
 
+# COMMAND ----------
+
 @dlt.table(name="silver_addresses_exact_matched")
 def silver_addresses_exact_matched():
     parsed = dlt.read_stream("silver_addresses_standardized")
@@ -136,6 +142,8 @@ def silver_addresses_exact_matched():
 # MAGIC
 # MAGIC For rows where `exact_hit = false` we call the index; top-5 candidates are
 # MAGIC passed to the LLM judge. Uses pandas UDF so each batch queries once.
+
+# COMMAND ----------
 
 from pyspark.sql.functions import pandas_udf
 import pandas as pd
@@ -188,6 +196,8 @@ def silver_addresses_candidates():
 # COMMAND ----------
 
 # MAGIC %md ## LLM judge: pick the correct candidate, emit confidence
+
+# COMMAND ----------
 
 JUDGE_PROMPT = """Given a standardized input address and a list of candidate matches from
 our US address reference database, pick the single best match or reply with index -1 if
@@ -249,6 +259,8 @@ def _col_to_sql(name: str) -> str:
 # COMMAND ----------
 
 # MAGIC %md ## Final gold table — score, av_status, geocode, enrichment
+
+# COMMAND ----------
 
 @dlt.table(name="gold_addresses_verified")
 def gold_addresses_verified():

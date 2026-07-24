@@ -25,6 +25,13 @@ dbutils.widgets.text("vs_endpoint", "address_verify_vs")
 dbutils.widgets.text("vs_index", "address_reference.us.address_reference_vs_idx")
 dbutils.widgets.text("lakebase_instance", "address_verify_cache")
 
+# COMMAND ----------
+
+# MAGIC %md Read the widget values. Adjust the widgets above if yours differ from the
+# MAGIC defaults, then re-run this cell to pick up the new values.
+
+# COMMAND ----------
+
 REGISTERED = dbutils.widgets.get("registered_model_name")
 SERVING = dbutils.widgets.get("serving_endpoint")
 VS_ENDPOINT = dbutils.widgets.get("vs_endpoint")

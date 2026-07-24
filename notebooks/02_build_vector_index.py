@@ -13,6 +13,13 @@ dbutils.widgets.text("schema", "us")
 dbutils.widgets.text("endpoint", "address_verify_vs")
 dbutils.widgets.text("index_name", "address_reference_vs_idx")
 
+# COMMAND ----------
+
+# MAGIC %md Read the widget values. Adjust the widgets above if yours differ from the
+# MAGIC defaults, then re-run this cell to pick up the new values.
+
+# COMMAND ----------
+
 CATALOG = dbutils.widgets.get("catalog")
 SCHEMA = dbutils.widgets.get("schema")
 ENDPOINT = dbutils.widgets.get("endpoint")
@@ -36,6 +43,8 @@ if ENDPOINT not in existing:
 # MAGIC Delta Sync Index: Databricks keeps the index in sync with the source table
 # MAGIC automatically. We embed `search_text` with the managed GTE endpoint.
 
+# COMMAND ----------
+
 index_exists = any(
     i["name"] == INDEX for i in vsc.list_indexes(ENDPOINT).get("vector_indexes", [])
 )
@@ -56,6 +65,8 @@ else:
 # COMMAND ----------
 
 # MAGIC %md ### Smoke test: query the index
+
+# COMMAND ----------
 
 idx = vsc.get_index(ENDPOINT, INDEX)
 result = idx.similarity_search(

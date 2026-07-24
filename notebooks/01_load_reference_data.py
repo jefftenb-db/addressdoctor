@@ -19,6 +19,13 @@ dbutils.widgets.text("catalog", "address_reference")
 dbutils.widgets.text("schema", "us")
 dbutils.widgets.text("openaddresses_volume", "/Volumes/address_reference/us/openaddresses")
 
+# COMMAND ----------
+
+# MAGIC %md Read the widget values. Adjust the widgets above if yours differ from the
+# MAGIC defaults, then re-run this cell to pick up the new values.
+
+# COMMAND ----------
+
 CATALOG = dbutils.widgets.get("catalog")
 SCHEMA = dbutils.widgets.get("schema")
 OA_VOL = dbutils.widgets.get("openaddresses_volume")
@@ -26,7 +33,7 @@ OA_VOL = dbutils.widgets.get("openaddresses_volume")
 # COMMAND ----------
 
 # MAGIC %md Set the session context. The catalog and schema are expected to already
-# MAGIC exist — adjust the widgets above if yours differ from the defaults, then run this.
+# MAGIC exist.
 
 # COMMAND ----------
 
