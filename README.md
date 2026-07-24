@@ -1,10 +1,7 @@
 # address-verify — Databricks-native replacement for Informatica Address Doctor (US)
 
-A starter kit for Solutions Architects replacing Informatica Address Doctor with a
+A starter kit for alternative to Informatica Address Doctor with a
 Databricks + Gen AI pipeline. US scope, no USPS CASS certification, batch + real-time.
-
-See [`../../../.claude/plans/can-you-provide-details-witty-twilight.md`](../../../.claude/plans/can-you-provide-details-witty-twilight.md)
-for the full plan, feature inventory, and customer talking points.
 
 ## Layout
 
@@ -42,8 +39,12 @@ Order matters — each notebook depends on the artifacts of the previous one.
    CREATE SCHEMA address_reference.us;
    CREATE VOLUME address_reference.raw.openaddresses;
    ```
-3. **Upload OpenAddresses US** state-by-state CSVs from https://batch.openaddresses.io/data
-   into `/Volumes/address_reference/raw/openaddresses/`.
+3. **Upload OpenAddresses US** address extracts from https://batch.openaddresses.io/data
+   into `/Volumes/address_reference/raw/openaddresses/`, preserving the per-state
+   subdirectory layout (`.../openaddresses/<state>/<file>-addresses-<scope>.geojson`).
+   The extracts are newline-delimited GeoJSON; the loader reads them directly and ingests
+   every `*-addresses-*.geojson` (statewide + county + city), de-duplicating on the
+   OpenAddresses `hash`.
 4. **Run `notebooks/01_load_reference_data.py`** as a job. Lands ~200M rows into
    `address_reference.us.address_reference` + ACS demographics.
 5. **Run `notebooks/02_build_vector_index.py`**. Creates the Vector Search endpoint

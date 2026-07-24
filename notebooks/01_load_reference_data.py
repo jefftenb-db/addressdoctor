@@ -32,27 +32,37 @@ spark.sql(f"USE SCHEMA {SCHEMA}")
 
 # MAGIC %md ## OpenAddresses
 # MAGIC
-# MAGIC Download state-by-state CSVs from https://batch.openaddresses.io/data (US
-# MAGIC collection) to the Unity Catalog volume, then land as Delta. Schema reference:
+# MAGIC Download the OpenAddresses US address extracts from
+# MAGIC https://batch.openaddresses.io/data (US collection) to the Unity Catalog
+# MAGIC volume, preserving the per-state subdirectory layout
+# MAGIC (`{volume}/<state>/<file>-addresses-<scope>.geojson`), then land as Delta.
+# MAGIC Schema reference:
 # MAGIC https://github.com/openaddresses/openaddresses/blob/master/CONTRIBUTING.md
+# MAGIC
+# MAGIC The extracts ship as newline-delimited GeoJSON (one `Feature` per line), which
+# MAGIC `spark.read.json` reads natively. We ingest every `*-addresses-*.geojson`
+# MAGIC (statewide + county + city layers) and de-duplicate on the OpenAddresses `hash`
+# MAGIC so rows that appear in both a statewide file and a county/city file collapse.
+# MAGIC Non-address layers (`-parcels-`, `-buildings-`, `-centerlines-`) are excluded by
+# MAGIC the glob.
 
 from pyspark.sql import functions as F
 
 oa_raw = (
-    spark.read.option("header", "true")
-    .csv(f"{OA_VOL}/*/*.csv")
+    spark.read.json(f"{OA_VOL}/*/*-addresses-*.geojson")
     .select(
-        F.col("LON").cast("double").alias("longitude"),
-        F.col("LAT").cast("double").alias("latitude"),
-        F.col("NUMBER").alias("primary_number"),
-        F.col("STREET").alias("street_raw"),
-        F.col("UNIT").alias("secondary_raw"),
-        F.col("CITY").alias("city"),
-        F.col("REGION").alias("state"),
-        F.col("POSTCODE").alias("zipcode"),
-        F.col("HASH").alias("oa_hash"),
+        F.col("geometry.coordinates")[0].cast("double").alias("longitude"),  # [lon, lat]
+        F.col("geometry.coordinates")[1].cast("double").alias("latitude"),
+        F.col("properties.number").alias("primary_number"),
+        F.col("properties.street").alias("street_raw"),
+        F.col("properties.unit").alias("secondary_raw"),
+        F.col("properties.city").alias("city"),
+        F.col("properties.region").alias("state"),
+        F.col("properties.postcode").alias("zipcode"),
+        F.col("properties.hash").alias("oa_hash"),
     )
     .filter(F.col("state").isNotNull() & F.col("zipcode").isNotNull())
+    .dropDuplicates(["oa_hash"])  # dedup statewide vs county/city overlap
 )
 
 (
