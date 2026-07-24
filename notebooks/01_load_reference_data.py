@@ -46,6 +46,8 @@ spark.sql(f"USE SCHEMA {SCHEMA}")
 # MAGIC Non-address layers (`-parcels-`, `-buildings-`, `-centerlines-`) are excluded by
 # MAGIC the glob.
 
+# COMMAND ----------
+
 from pyspark.sql import functions as F
 
 oa_raw = (
@@ -79,6 +81,8 @@ oa_raw = (
 # MAGIC This produces the reference table we'll build the Vector Search index over.
 # MAGIC Every reference row gets split into the same AddressSchema fields and
 # MAGIC standardized identically to runtime inputs, so exact-match joins are possible.
+
+# COMMAND ----------
 
 # MAGIC %pip install -q -e /Workspace/Repos/${user}/addressdoctor
 
@@ -173,6 +177,8 @@ spark.sql(f"""
 # MAGIC Pull ACS 5-year estimates by ZCTA from https://api.census.gov/data. This is
 # MAGIC our CAMEO-equivalent: median income, household size, population density, etc.
 
+# COMMAND ----------
+
 import urllib.request, json
 
 ACS_VARS = ["B01003_001E", "B19013_001E", "B25010_001E", "B02001_002E"]
@@ -201,6 +207,8 @@ acs_df = spark.createDataFrame(data, schema=header).select(
 # COMMAND ----------
 
 # MAGIC %md ## Sanity check
+
+# COMMAND ----------
 
 display(spark.sql(f"""
     SELECT state, COUNT(*) AS rows
