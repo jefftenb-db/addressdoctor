@@ -15,6 +15,39 @@
 
 # COMMAND ----------
 
+# MAGIC %md ## Install the local `address_verify` package
+# MAGIC
+# MAGIC Self-locating: we derive the repo root from this notebook's own path, so it works
+# MAGIC regardless of which user or Workspace folder the repo lives in — no hardcoded name.
+# MAGIC We use `%pip install -e` (not a `sys.path` append) because the standardizer runs
+# MAGIC inside a Spark UDF on the executors, and notebook-scoped `%pip` distributes the
+# MAGIC package to them. This cell triggers a Python restart, so it must run first.
+# MAGIC
+# MAGIC The `%pip` magic can't read a Python variable, so we invoke it via
+# MAGIC `run_line_magic` with the computed path — this keeps the install notebook-scoped.
+
+# COMMAND ----------
+
+# Derive the repo root (the folder containing pyproject.toml) from this notebook's path:
+# /Workspace/<...>/addressdoctor/notebooks/01_... -> /Workspace/<...>/addressdoctor
+_nb_path = (
+    dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+)
+repo_root = "/Workspace" + "/".join(_nb_path.split("/")[:-2])
+print(f"Installing address_verify (editable) from: {repo_root}")
+
+get_ipython().run_line_magic("pip", f"install -q -e {repo_root}")
+
+# COMMAND ----------
+
+# MAGIC %md Restart Python so the freshly installed package is importable, then continue.
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 dbutils.widgets.text("catalog", "address_reference")
 dbutils.widgets.text("schema", "us")
 dbutils.widgets.text("openaddresses_volume", "/Volumes/address_reference/us/openaddresses")
@@ -93,10 +126,6 @@ oa_raw = (
 # MAGIC This produces the reference table we'll build the Vector Search index over.
 # MAGIC Every reference row gets split into the same AddressSchema fields and
 # MAGIC standardized identically to runtime inputs, so exact-match joins are possible.
-
-# COMMAND ----------
-
-# MAGIC %pip install -q -e /Workspace/Repos/${user}/addressdoctor
 
 # COMMAND ----------
 
