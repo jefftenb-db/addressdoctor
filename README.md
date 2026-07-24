@@ -14,6 +14,7 @@ src/address_verify/      # Pure-Python core (unit-tested locally)
   eval/                  # Golden dataset + eval harness
 tests/                   # pytest — runs offline, no Databricks required
 notebooks/               # Databricks notebooks (Jobs/DLT/Model Serving)
+  00_download_openaddresses.py
   01_load_reference_data.py
   02_build_vector_index.py
   03_parse_standardize_validate.py
@@ -39,12 +40,20 @@ Order matters — each notebook depends on the artifacts of the previous one.
    CREATE SCHEMA address_reference.us;
    CREATE VOLUME address_reference.raw.openaddresses;
    ```
-3. **Upload OpenAddresses US** address extracts from https://batch.openaddresses.io/data
-   into `/Volumes/address_reference/raw/openaddresses/`, preserving the per-state
-   subdirectory layout (`.../openaddresses/<state>/<file>-addresses-<scope>.geojson`).
-   The extracts are newline-delimited GeoJSON; the loader reads them directly and ingests
-   every `*-addresses-*.geojson` (statewide + county + city), de-duplicating on the
-   OpenAddresses `hash`.
+3. **Fetch OpenAddresses data into the volume.** Store your
+   [batch.openaddresses.io](https://batch.openaddresses.io/docs) API token in a secret,
+   then run `notebooks/00_download_openaddresses.py`:
+   ```bash
+   databricks secrets create-scope openaddresses
+   databricks secrets put-secret openaddresses api_token   # paste your token
+   ```
+   Set the `collections` widget (default `us-northeast`; also `us-south`, `us-west`,
+   `us-midwest`) and point `secret_scope`/`secret_key` at that secret. The notebook
+   downloads each collection zip and extracts only `*-addresses-*.geojson` (statewide +
+   county + city) straight into `/Volumes/address_reference/raw/openaddresses/<state>/`
+   — no laptop round-trip. _Fallback:_ you can instead manually download the GeoJSON
+   extracts and upload them, preserving that same per-state layout. The loader reads the
+   newline-delimited GeoJSON directly and de-duplicates on the OpenAddresses `hash`.
 4. **Run `notebooks/01_load_reference_data.py`** as a job. Lands ~200M rows into
    `address_reference.us.address_reference` + ACS demographics.
 5. **Run `notebooks/02_build_vector_index.py`**. Creates the Vector Search endpoint
