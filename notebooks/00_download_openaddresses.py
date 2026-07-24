@@ -31,11 +31,11 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("openaddresses_volume", "/Volumes/address_reference/raw/openaddresses")
+dbutils.widgets.text("openaddresses_volume", "/Volumes/address_reference/us/openaddresses")
 dbutils.widgets.text("collections", "us-northeast")
 dbutils.widgets.text("secret_scope", "openaddresses")
 dbutils.widgets.text("secret_key", "api_token")
-dbutils.widgets.text("staging_dir", "/local_disk0/oa_zips")
+dbutils.widgets.text("staging_dir", "/tmp/oa_zips")
 dbutils.widgets.dropdown("keep_zip", "false", ["true", "false"])
 
 OA_VOL = dbutils.widgets.get("openaddresses_volume")

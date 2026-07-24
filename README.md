@@ -38,7 +38,7 @@ Order matters — each notebook depends on the artifacts of the previous one.
    ```sql
    CREATE CATALOG address_reference;
    CREATE SCHEMA address_reference.us;
-   CREATE VOLUME address_reference.raw.openaddresses;
+   CREATE VOLUME address_reference.us.openaddresses;
    ```
 3. **Fetch OpenAddresses data into the volume.** Store your
    [batch.openaddresses.io](https://batch.openaddresses.io/docs) API token in a secret,
@@ -50,7 +50,7 @@ Order matters — each notebook depends on the artifacts of the previous one.
    Set the `collections` widget (default `us-northeast`; also `us-south`, `us-west`,
    `us-midwest`) and point `secret_scope`/`secret_key` at that secret. The notebook
    downloads each collection zip and extracts only `*-addresses-*.geojson` (statewide +
-   county + city) straight into `/Volumes/address_reference/raw/openaddresses/<state>/`
+   county + city) straight into `/Volumes/address_reference/us/openaddresses/<state>/`
    — no laptop round-trip. _Fallback:_ you can instead manually download the GeoJSON
    extracts and upload them, preserving that same per-state layout. The loader reads the
    newline-delimited GeoJSON directly and de-duplicates on the OpenAddresses `hash`.

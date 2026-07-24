@@ -17,7 +17,7 @@
 
 dbutils.widgets.text("catalog", "address_reference")
 dbutils.widgets.text("schema", "us")
-dbutils.widgets.text("openaddresses_volume", "/Volumes/address_reference/raw/openaddresses")
+dbutils.widgets.text("openaddresses_volume", "/Volumes/address_reference/us/openaddresses")
 
 CATALOG = dbutils.widgets.get("catalog")
 SCHEMA = dbutils.widgets.get("schema")
