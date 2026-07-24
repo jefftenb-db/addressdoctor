@@ -23,8 +23,6 @@ CATALOG = dbutils.widgets.get("catalog")
 SCHEMA = dbutils.widgets.get("schema")
 OA_VOL = dbutils.widgets.get("openaddresses_volume")
 
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 spark.sql(f"USE CATALOG {CATALOG}")
 spark.sql(f"USE SCHEMA {SCHEMA}")
 
