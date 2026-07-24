@@ -133,6 +133,7 @@ oa_raw = (
 
 # COMMAND ----------
 
+from pyspark.sql import functions as F
 from pyspark.sql.types import StringType, StructField, StructType
 from address_verify.schemas import AddressSchema
 from address_verify.standardize import standardize_address, format_delivery_line
@@ -225,6 +226,8 @@ spark.sql(f"""
 # COMMAND ----------
 
 import urllib.request, json
+
+from pyspark.sql import functions as F
 
 ACS_VARS = ["B01003_001E", "B19013_001E", "B25010_001E", "B02001_002E"]
 year = 2022
