@@ -124,12 +124,11 @@ oa_raw = (
         F.col("properties.postcode").alias("zipcode"),
         F.col("properties.hash").alias("oa_hash"),
     )
-    # Require a non-empty state and zipcode. isNotNull alone leaked empty strings ("")
-    # through, so trim(...) != "" is needed to drop rows missing these fields.
-    .filter(
-        (F.col("state").isNotNull() & (F.trim("state") != ""))
-        & (F.col("zipcode").isNotNull() & (F.trim("zipcode") != ""))
-    )
+    # Require a non-empty state (isNotNull alone leaked empty strings, so trim != "").
+    # We intentionally do NOT require zipcode: some sources (notably all of New
+    # Hampshire) have no postcode upstream. Those rows keep a null/empty zip here and
+    # get a spatially-derived ZIP backfilled from Census ZCTA polygons further below.
+    .filter(F.col("state").isNotNull() & (F.trim("state") != ""))
     .dropDuplicates(["oa_hash"])  # dedup statewide vs county/city overlap
 )
 
@@ -139,6 +138,138 @@ oa_raw = (
     .clusterBy("state", "zipcode")
     .saveAsTable(f"{CATALOG}.{SCHEMA}.openaddresses_us")
 )
+
+# COMMAND ----------
+
+# MAGIC %md ## Load Census ZCTA boundaries (for ZIP backfill)
+# MAGIC
+# MAGIC Some OpenAddresses sources have no `postcode` upstream — most notably **all of
+# MAGIC New Hampshire**, whose source GIS layers don't map a ZIP. Every row still has
+# MAGIC rooftop lat/lon, so we assign those points to a **Census ZCTA** polygon and use
+# MAGIC the ZCTA5 code as an (estimated) ZIP.
+# MAGIC
+# MAGIC ZCTAs are decennial, so the boundary file lives under Census GENZ2020:
+# MAGIC `cb_2020_us_zcta520_500k.zip` (~33K polygons — small enough to read on the driver
+# MAGIC with geopandas). We store each polygon's H3 cover cells so the point→polygon join
+# MAGIC is an H3 equijoin (fast) rather than an N×M spatial cross join.
+
+# COMMAND ----------
+
+# MAGIC %pip install -q geopandas
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# Re-establish config after the restart (widgets persist; Python state does not).
+from pyspark.sql import functions as F
+
+CATALOG = dbutils.widgets.get("catalog")
+SCHEMA = dbutils.widgets.get("schema")
+spark.sql(f"USE CATALOG {CATALOG}")
+spark.sql(f"USE SCHEMA {SCHEMA}")
+
+# H3 resolution for the ZCTA cover / point lookup. Res 7 (~5 km² cells) keeps the
+# per-polygon cover-cell count modest while still pruning the join hard.
+H3_RES = 7
+
+# COMMAND ----------
+
+import os
+import urllib.request
+import zipfile
+
+import geopandas as gpd
+
+_ZCTA_URL = "https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_zcta520_500k.zip"
+_stage = "/local_disk0/zcta"
+os.makedirs(_stage, exist_ok=True)
+_zip_path = os.path.join(_stage, "zcta.zip")
+
+urllib.request.urlretrieve(_ZCTA_URL, _zip_path)
+with zipfile.ZipFile(_zip_path) as zf:
+    zf.extractall(_stage)
+
+gdf = gpd.read_file(_stage)  # reads the .shp in the dir
+gdf = gdf.to_crs(4326)  # ensure WGS84 lon/lat
+# ZCTA5CE20 is the 5-digit ZCTA code column in the 2020 cartographic file.
+zcta_pdf = gdf[["ZCTA5CE20", "geometry"]].rename(columns={"ZCTA5CE20": "zcta"})
+zcta_pdf["geojson"] = zcta_pdf["geometry"].apply(lambda g: g.__geo_interface__).apply(
+    __import__("json").dumps
+)
+zcta_pdf = zcta_pdf[["zcta", "geojson"]]
+print(f"ZCTA polygons: {len(zcta_pdf):,}")
+
+# COMMAND ----------
+
+# Land the polygons as Delta with a WKB geometry column, then explode each polygon's
+# H3 cover cells into (zcta, h3_cell) for the equijoin pre-filter.
+zcta_sdf = (
+    spark.createDataFrame(zcta_pdf)
+    .withColumn("geom", F.expr("ST_SetSRID(ST_GeomFromGeoJSON(geojson), 4326)"))
+    .withColumn("geom_wkb", F.expr("ST_AsBinary(geom)"))
+    .select("zcta", "geom_wkb")
+)
+zcta_sdf.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.zcta_boundaries")
+
+zcta_h3 = (
+    spark.table(f"{CATALOG}.{SCHEMA}.zcta_boundaries")
+    .withColumn("h3_cell", F.explode(F.expr(f"h3_coverash3(geom_wkb, {H3_RES})")))
+    .select("zcta", "h3_cell", "geom_wkb")
+)
+zcta_h3.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.zcta_h3")
+
+# COMMAND ----------
+
+# MAGIC %md ## Backfill missing ZIPs from ZCTA polygons
+# MAGIC
+# MAGIC For rows whose zip is null/empty we compute the point's H3 cell, equijoin to the
+# MAGIC ZCTA cover cells (fast prune), then confirm with `ST_Contains` for the exact
+# MAGIC polygon (a point's cell can overlap more than one ZCTA at boundaries). Matched
+# MAGIC rows get `zipcode = zcta` and `zip_is_estimated = true`. Rows that already have a
+# MAGIC zip are untouched (`zip_is_estimated = false`).
+
+# COMMAND ----------
+
+_oa = spark.table(f"{CATALOG}.{SCHEMA}.openaddresses_us")
+_oa_cols = _oa.columns  # original column list, before the join adds zcta/h3_cell/geom_wkb
+_has_zip = _oa.filter(F.col("zipcode").isNotNull() & (F.trim("zipcode") != ""))
+_no_zip = _oa.filter(F.col("zipcode").isNull() | (F.trim("zipcode") == ""))
+
+_pt_cell = F.expr(f"h3_longlatash3(longitude, latitude, {H3_RES})")
+# WKB carries no SRID, so re-tag it 4326 to match the point (else ST_Contains errors
+# with ST_DIFFERENT_SRID_VALUES).
+_contains = F.expr(
+    "ST_Contains(ST_SetSRID(ST_GeomFromWKB(geom_wkb), 4326), "
+    "ST_SetSRID(ST_Point(longitude, latitude), 4326))"
+)
+
+_zcta_h3 = spark.table(f"{CATALOG}.{SCHEMA}.zcta_h3")
+_backfilled = (
+    _no_zip.withColumn("_h3", _pt_cell)
+    .join(_zcta_h3, F.col("_h3") == F.col("h3_cell"), "left")
+    .filter(F.col("zcta").isNull() | _contains)  # keep exact containment (or no match)
+    # A point may hit multiple candidate cells; keep one containing ZCTA per row.
+    .dropDuplicates(["oa_hash"])
+    .withColumn("zip_is_estimated", F.col("zcta").isNotNull())
+    .withColumn("zipcode", F.coalesce(F.col("zcta"), F.col("zipcode")))
+    .select(*_oa_cols, "zip_is_estimated")
+)
+
+_openaddresses_final = (
+    _has_zip.withColumn("zip_is_estimated", F.lit(False))
+    .select(*_oa_cols, "zip_is_estimated")
+    .unionByName(_backfilled)
+)
+
+# Write to a distinct table rather than overwriting openaddresses_us in place — reading
+# and overwriting the same table in one operation is unsafe in Spark. Downstream reads
+# this geocoded table.
+_openaddresses_final.write.mode("overwrite").option(
+    "delta.columnMapping.mode", "name"
+).clusterBy("state", "zipcode").saveAsTable(f"{CATALOG}.{SCHEMA}.openaddresses_us_geocoded")
 
 # COMMAND ----------
 
@@ -197,7 +328,7 @@ def _split_street_udf(primary_number: str, street_raw: str, secondary_raw: str):
 
 
 ref = (
-    spark.table(f"{CATALOG}.{SCHEMA}.openaddresses_us")
+    spark.table(f"{CATALOG}.{SCHEMA}.openaddresses_us_geocoded")
     .withColumn("_s", _split_street_udf("primary_number", "street_raw", "secondary_raw"))
     .select(
         "latitude", "longitude",
@@ -219,6 +350,7 @@ ref = (
             F.col("zipcode"),
         ).alias("search_text"),
         F.col("oa_hash"),
+        F.col("zip_is_estimated"),  # true for spatially-derived (ZCTA) ZIPs, e.g. NH
     )
 )
 
